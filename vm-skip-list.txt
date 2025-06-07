@@ -1,0 +1,21 @@
+# VM Skip List
+# Each line is a pattern to match against VM names
+# Lines starting with # are comments and will be ignored
+# Wildcards (*) can be used to match any characters
+
+# VMC-A Infrastructure VMs
+*Interconnect-IX*
+*Interconnect-NE*
+*Interconnect-SDR*
+*Interconnect-WO*
+hcx_cloud_manager
+NSX-Edge-*
+NSX-Manager-*
+srm
+vr
+vcenter
+
+# vSphere Cluster Service VMs
+vCLS-*
+
+# Add your custom patterns below
