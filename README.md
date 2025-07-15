@@ -90,6 +90,7 @@ The text file `vm-skip-list.txt` contains a list of VMs - if entries here match 
 | EXP_VCENTER_PASSWORD             | vCenter password                                   | str  | Yes
 | EXP_DISABLE_SSL_VERIFICATION     | If true, disables SSL check for vCenter connection | bool | No
 
+> Note: An account with the Administrator role is shown in the examples below. A Read-Only role is supported if you add the user at the top level of the vCenter.
 
 Windows:
 
