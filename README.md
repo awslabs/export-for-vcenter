@@ -2,6 +2,8 @@
 
 Export for vCenter is a Python script designed to collect inventory data from VMware vCenter. It retrieves only data that is required as inputs for [AWS Transform for VMware](https://aws.amazon.com/transform/vmware/) and [AWS Transform Assessments](https://aws.amazon.com/transform/assessment/). Data is written out with filenames and column headers that match the [RVTools](https://www.robware.net/download) CSV format. This is not a replacement for RVTools as it retrieves only the data required by AWS Transform. 
 
+The tool now also includes functionality to collect performance metrics using vCenter performance statistics.
+
 ## Getting started
 
 Why might you want to use Export for vCenter instead of RVTools?
@@ -129,6 +131,8 @@ export EXP_VCENTER_PASSWORD="xxxxx"
 
 ### Run the script
 
+#### Basic Usage
+
 Windows
 
 ```
@@ -141,12 +145,94 @@ Linux/Mac:
 python3 vcexport.py
 ```
 
+#### Command Line Options
+
+The script supports several command line options to customize the export:
+
+```bash
+# Default behavior - exports inventory and performance statistics (60 minutes)
+python3 vcexport.py
+
+# Skip performance statistics collection
+python3 vcexport.py --no-statistics
+
+# Custom performance collection time windows
+python3 vcexport.py --perf-interval 240     # 4 hours of performance data
+python3 vcexport.py --perf-interval 1440    # 24 hours of performance data
+python3 vcexport.py --perf-interval 10080   # 7 days of performance data
+python3 vcexport.py --perf-interval 43200   # 30 days of performance data
+
+# Show help
+python3 vcexport.py --help
+```
+
+**Performance Collection Options:**
+- `--perf-interval MINUTES`: Time interval in minutes for performance collection (default: 60)
+- `--no-statistics`: Skip performance statistics collection entirely
+
+The script automatically determines the appropriate vCenter sampling period based on the time interval:
+- **≤ 60 minutes**: 20-second real-time intervals
+- **≤ 24 hours**: 5-minute short-term intervals
+- **≤ 7 days**: 30-minute medium-term intervals
+- **≤ 30 days**: 2-hour long-term intervals
+- **> 30 days**: 1-day historical intervals
+
 ### Script output
 
-The script will output a file named `vcexport.zip` in the same folder as `vcexport.py`.
+The script will output a file named `vcexport.zip` in the same folder as `vcexport.py`. This zip file contains:
+- Standard inventory data in RVTools CSV format
+- Performance metrics data collected from vCenter performance statistics
 
 ### Cleanup
 
 - Close your terminal session
 - Optional - Delete the export file vcexport.zip
 - Optional - If you will not be doing any new exports, delete the entire project folder
+
+## Performance Metrics Collection
+
+Export for vCenter now includes functionality to collect performance metrics from vCenter using performance statistics API. The performance metrics collection automatically gathers the following metrics for all powered-on VMs:
+- `maxCpuUsagePctDec` (maximum CPU usage percentage as decimal)
+- `avgCpuUsagePctDec` (average CPU usage percentage as decimal)
+- `maxRamUsagePctDec` (maximum RAM usage percentage as decimal)
+- `avgRamUtlPctDec` (average RAM utilization percentage as decimal)
+- `Storage-Max Read IOPS Size` (maximum virtual disk read request size in bytes)
+- `Storage-Max Write IOPS Size` (maximum virtual disk write request size in bytes)
+
+Performance metrics are collected over a 60-minute interval with 180 samples.
+
+**Default Collection Settings:**
+- **Time Window**: 60 minutes (uses the 20-second real-time interval)
+- **Sample Count**: 180 samples (one sample every 20 seconds for 60 minutes)
+- **Data Source**: Real-time performance statistics from vCenter
+
+**Why These Defaults Were Chosen:**
+- **60 minutes**: Provides a meaningful performance window while staying within the real-time data retention period
+- **180 samples**: Gives granular 20-second intervals across the full hour (60 minutes ÷ 20 seconds = 180 samples)
+- **20-second interval**: Most granular data available, best for capturing performance spikes and variations
+
+**Note**: This tool uses whatever performance statistics are already being collected by your vCenter. Most vCenter environments have basic performance collection enabled by default, so no additional configuration is needed.
+
+**Automatic Sampling Period Selection:**
+The tool automatically selects the appropriate vCenter historical interval based on your requested time window:
+- Use `--perf-interval 60` for detailed recent performance (20-second sampling)
+- Use `--perf-interval 240` for 4-hour trends (5-minute sampling)
+- Use `--perf-interval 1440` for daily patterns (30-minute sampling)
+- Use `--perf-interval 10080` for weekly analysis (2-hour sampling)
+- Use `--perf-interval 43200` for monthly capacity planning (daily sampling)
+
+##### Performance Data Sampling Periods
+
+vCenter Server's PerformanceManager uses predefined historical intervals for collecting and storing performance data. According to [VMware documentation](https://vdc-download.vmware.com/vmwb-repository/dcr-public/8e6af87a-b054-416d-8b61-aa9fba096944/617db479-aee6-4717-a94c-8bddd19785b9/vim.HistoricalInterval.html#samplingPeriod), these intervals are:
+
+| Interval ID | Sampling Period | Description | Data Retention |
+|-------------|----------------|-------------|----------------|
+| 20          | 20 seconds     | Real-time   | Stored for 1 hour |
+| 300         | 5 minutes      | Short-term  | Stored for 1 day |
+| 1800        | 30 minutes     | Medium-term | Stored for 1 week |
+| 7200        | 2 hours        | Long-term   | Stored for 1 month |
+| 86400       | 1 day          | Historical  | Stored for 1 year |
+
+When using the Export for vCenter performance collection functions, the `interval_mins` parameter determines which historical interval is used, and the `samples` parameter determines how many data points to collect within that interval. Choose appropriate values based on your assessment needs and the retention period required.
+
+**Note**: The default 60-minute collection window uses the 20-second real-time interval (Interval ID 20) from the table above. This provides the most granular performance data available, but is limited to the past hour. For longer historical periods, you would need to adjust the collection parameters to use different sampling intervals.

@@ -2,6 +2,7 @@
 """
 Script to export virtual machine and related config info from vCenter to a CSV file.
 """
+import argparse
 import csv
 import os
 import zipfile
@@ -13,6 +14,8 @@ import sys
 
 from pyVim import connect
 from pyVmomi import vim
+
+from performance_manager import PerformanceCollector
 
 def write_csv_file(filename, headers, data_list):
     """
@@ -39,6 +42,54 @@ def write_csv_file(filename, headers, data_list):
         print(f"Error writing CSV file: {str(e.Message)}")
         return False
 
+
+def collect_performance_metrics(service_instance, vms, output_dir, interval_mins=60, samples=12):
+    """
+    Collect and export performance metrics for VMs.
+    
+    Args:
+        service_instance: The vCenter service instance
+        vms (list): List of VM objects to collect metrics for
+        output_dir (str): Directory to save the performance metrics CSV file
+        interval_mins (int): Time interval in minutes for metrics collection
+        samples (int): Number of samples to collect
+        
+    Returns:
+        str: Path to the generated CSV file, or None if collection failed
+    """
+    try:
+        # Create performance collector
+        perf_collector = PerformanceCollector(service_instance)
+        
+        # Filter for powered on VMs
+        powered_on_vms = [vm for vm in vms if vm.runtime.powerState == 'poweredOn']
+        
+        print(f"Collecting performance metrics for {len(powered_on_vms)} powered on VMs")
+        print(f"Time interval: {interval_mins} minutes, Samples: {samples}")
+        
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # Generate timestamp for filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Export VM metrics to CSV
+        csv_filename = f"{output_dir}/detailed_vm_metrics_{timestamp}.csv"
+        print(f"Exporting detailed VM metrics to {csv_filename}")
+        
+        success = perf_collector.export_detailed_vm_metrics_to_csv(powered_on_vms, csv_filename, interval_mins, samples)
+        
+        if success:
+            print(f"Successfully exported detailed VM metrics to {csv_filename}")
+            return csv_filename
+        else:
+            print("Failed to export detailed VM metrics")
+            return None
+            
+    except Exception as e:
+        print(f"Error collecting performance metrics: {str(e)}")
+        return None
 
 def load_vm_skip_list(filename):
     """
@@ -94,6 +145,7 @@ def connect_to_vcenter(host, user, password, port=443, disable_ssl_verification=
             user=user,
             pwd=password,
             port=port,
+            disableSslCertValidation=disable_ssl_verification,
             sslContext=context
         )
         
@@ -908,7 +960,8 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
                   vtools_file="RVTools_tabvTools.csv", vhost_file="RVTools_tabvHost.csv", vnic_file="RVTools_tabvNIC.csv",
                   sc_vmk_file="RVTools_tabvSC_VMK.csv", vswitch_file="RVTools_tabvSwitch.csv", 
                   dvswitch_file="RVTools_tabdvSwitch.csv", vport_file="RVTools_tabvPort.csv", 
-                  dvport_file="RVTools_tabdvPort.csv", max_count=None, purge_csv=True):
+                  dvport_file="RVTools_tabdvPort.csv", performance_file="vcexport_tabvPerformance.csv", max_count=None, purge_csv=True, 
+                  export_statistics=True, perf_interval=60):
     """
     Export VM data to CSV files.
     
@@ -927,8 +980,11 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
         dvswitch_file (str): Path to the distributed virtual switch output CSV file
         vport_file (str): Path to the standard virtual switch ports output CSV file
         dvport_file (str): Path to the distributed virtual switch ports output CSV file
+        performance_file (str): Path to the performance metrics from vCenter using performance statistics
         max_count (int, optional): Maximum number of VMs to process
         purge_csv (bool, optional): If true, individual CSV files are deleted after zipping
+        export_statistics (bool, optional): If true, collect performance statistics (default: True)
+        perf_interval (int, optional): Performance collection time interval in minutes (default: 60). Sampling period is automatically determined.
         
     Returns:
         tuple: Paths to the created CSV files
@@ -954,6 +1010,7 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
     os.makedirs(os.path.dirname(os.path.abspath(dvswitch_file)), exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(vport_file)), exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(dvport_file)), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(performance_file)), exist_ok=True)
     
 
     # Get content and container view
@@ -991,6 +1048,20 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
     # Get distributed virtual port properties
     print("Getting distributed port group properties...")
     dvport_properties_list = get_vm_dvport_properties(content, container)
+    
+    # Get performance metric properties
+    if export_statistics:
+        print("Getting performance metric properties...")
+        perf_collector = PerformanceCollector(service_instance) # Create performance collector
+        performance_properties_list =  perf_collector.get_performance_properties(
+            content, 
+            container, 
+            interval_mins=perf_interval
+        )
+    else:
+        print("Skipping performance statistics collection (--no-statistics specified)")
+        performance_properties_list = []
+        perf_collector = None
     
     # Get content and container view
     #content = service_instance.RetrieveContent()
@@ -1181,6 +1252,12 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
         # Define headers for distributed virtual ports
         dvport_headers = ["Port", "Switch", "VLAN"]
         
+        # Define headers for performance metrics
+        if export_statistics and perf_collector:
+            performance_headers = perf_collector.get_metric_headers()
+        else:
+            performance_headers = ["VM Name", "VM UUID", "Timestamp"]  # Minimal headers for empty file
+        
         # Write VM info to CSV
         success = write_csv_file(info_file, info_headers, vm_info_list)
         if success:
@@ -1258,11 +1335,20 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
         if success:
             print(f"Exported distributed virtual port data for {len(dvport_properties_list)} port groups to {dvport_file}")
         
+        # Write performance metrics data to CSV
+        success = write_csv_file(performance_file, performance_headers, performance_properties_list)
+        if success:
+            if export_statistics:
+                print(f"Exported performance metrics data for {len(performance_properties_list)} VMs to {performance_file}")
+            else:
+                print(f"Created empty performance file (statistics collection disabled): {performance_file}")
+        
         # Create a zip file containing all CSV files
         zip_filename = "vcexport.zip"
         csv_files = [info_file, network_file, vcpu_file, memory_file, disk_file, 
                     partition_file, vsource_file, vtools_file, vhost_file, vnic_file, 
-                    sc_vmk_file, vswitch_file, dvswitch_file, vport_file, dvport_file]
+                    sc_vmk_file, vswitch_file, dvswitch_file, vport_file, dvport_file, 
+                    performance_file]
         
         with zipfile.ZipFile(zip_filename, 'w') as zipf:
             for file in csv_files:
@@ -1291,6 +1377,41 @@ if __name__ == "__main__":
         print(f"Current Python version: {sys.version}")
         sys.exit(1)
     
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Export VM data from vCenter to CSV files in RVTools format",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+    Environment Variables Required:
+    EXP_VCENTER_HOST      vCenter FQDN (do not include https://)
+    EXP_VCENTER_USER      vCenter username
+    EXP_VCENTER_PASSWORD  vCenter password
+
+    Performance Collection Examples:
+    python vcexport.py                          # Default: 60 minutes
+    python vcexport.py --perf-interval 240     # 4 hours of data
+    python vcexport.py --perf-interval 1440    # 24 hours of data
+    python vcexport.py --no-statistics         # Skip performance collection
+        """
+    )
+    
+    parser.add_argument(
+        "--no-statistics",
+        action="store_false",
+        dest="export_statistics",
+        default=True,
+        help="Skip performance statistics collection"
+    )
+    
+    parser.add_argument(
+        "--perf-interval",
+        type=int,
+        default=60,
+        help="Performance collection time interval in minutes (default: 60). Sampling period is automatically determined."
+    )
+    
+    args = parser.parse_args()
+    
     # Get vCenter details from environment variables
     vcenter_host = os.environ.get("EXP_VCENTER_HOST")
     vcenter_user = os.environ.get("EXP_VCENTER_USER")
@@ -1313,4 +1434,10 @@ if __name__ == "__main__":
     # Export VM data to CSV
     if si:
         print("Starting export process, this will take some time...")
-        export_vm_data(si,max_count=None, purge_csv=True)
+        export_vm_data(
+            si, 
+            max_count=None, 
+            purge_csv=True,
+            export_statistics=args.export_statistics,
+            perf_interval=args.perf_interval
+        )
