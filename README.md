@@ -133,16 +133,22 @@ export EXP_VCENTER_PASSWORD="xxxxx"
 
 #### Basic Usage
 
+The main script is located in the `src/` directory, but you can run it from the project root using the provided runner script:
+
 Windows
 
-```
-python .\vcexport.py
+```powershell
+
+# Run from src directory
+python .\src\vcexport.py
 ```
 
 Linux/Mac:
 
 ```bash
-python3 vcexport.py
+
+# Run from src directory
+python3 src/vcexport.py
 ```
 
 #### Command Line Options
@@ -151,19 +157,19 @@ The script supports several command line options to customize the export:
 
 ```bash
 # Default behavior - exports inventory and performance statistics (60 minutes)
-python3 vcexport.py
+python3 src/vcexport.py
 
 # Skip performance statistics collection
-python3 vcexport.py --no-statistics
+python3 src/vcexport.py --no-statistics
 
 # Custom performance collection time windows
-python3 vcexport.py --perf-interval 240     # 4 hours of performance data
-python3 vcexport.py --perf-interval 1440    # 24 hours of performance data
-python3 vcexport.py --perf-interval 10080   # 7 days of performance data
-python3 vcexport.py --perf-interval 43200   # 30 days of performance data
+python3 src/vcexport.py --perf-interval 240     # 4 hours of performance data
+python3 src/vcexport.py --perf-interval 1440    # 24 hours of performance data
+python3 src/vcexport.py --perf-interval 10080   # 7 days of performance data
+python3 src/vcexport.py --perf-interval 43200   # 30 days of performance data
 
 # Show help
-python3 vcexport.py --help
+python3 src/vcexport.py --help
 ```
 
 **Performance Collection Options:**
@@ -236,3 +242,51 @@ vCenter Server's PerformanceManager uses predefined historical intervals for col
 When using the Export for vCenter performance collection functions, the `interval_mins` parameter determines which historical interval is used, and the `samples` parameter determines how many data points to collect within that interval. Choose appropriate values based on your assessment needs and the retention period required.
 
 **Note**: The default 60-minute collection window uses the 20-second real-time interval (Interval ID 20) from the table above. This provides the most granular performance data available, but is limited to the past hour. For longer historical periods, you would need to adjust the collection parameters to use different sampling intervals.
+
+## Testing
+
+Export for vCenter includes comprehensive unit and integration tests to ensure reliability and functionality.
+
+### Prerequisites for Testing
+
+1. **Python Dependencies**: Install test dependencies from requirements.txt
+2. **Docker**: Required for integration tests (to run vCenter simulator)
+
+### Running Unit Tests
+
+Unit tests use mocks and don't require external dependencies:
+
+```bash
+# Run unit tests with coverage
+pytest -k unit -v --cov=src
+```
+
+### Running Integration Tests
+
+Integration tests require a running vCenter simulator (vcsim) to test against real vCenter API behavior.
+
+**Step 1: Start vCenter Simulator**
+```bash
+# Start vcsim Docker container
+docker run -p 9090:9090 vmware/vcsim -l :9090
+```
+
+**Step 2: Run Integration Tests** (in a separate terminal)
+```bash
+# Run integration tests with coverage
+pytest -k integration -v --cov=src
+```
+
+### Running All Tests
+
+```bash
+# Make sure vcsim is running first, then:
+pytest -v --cov=src
+```
+
+### About vcsim
+
+- **vcsim** is a vCenter and ESXi API based simulator from VMware
+- Provides a lightweight way to test vCenter API interactions without a real vCenter environment
+- Integration tests connect to `localhost:9090` where vcsim runs
+- More information: https://hub.docker.com/r/vmware/vcsim
