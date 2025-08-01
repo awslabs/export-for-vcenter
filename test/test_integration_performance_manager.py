@@ -3,23 +3,25 @@ import pytest
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 import atexit
-from src.performance_manager import PerformanceCollector
+from src.collectors.performance_collector import PerformanceCollector
 
 class TestPerformanceCollectorIntegration:
     @pytest.fixture(scope="class")
     def vcenter_connection(self):
         """Create connection to vcsim"""
-        
-        si = SmartConnect(
-            host='localhost',
-            user='user',
-            pwd='pass',
-            port=9090,
-            sslContext=None
-        )
-        
-        atexit.register(Disconnect, si)
-        return si
+        try: 
+            si = SmartConnect(
+                host='localhost',
+                user='user',
+                pwd='pass',
+                port=9090,
+                sslContext=None
+            )
+            
+            atexit.register(Disconnect, si)
+            return si
+        except Exception as e:
+            pytest.skip(f"Could not connect to vcsim: {e}")
 
     @pytest.fixture(scope="class")
     def collector(self, vcenter_connection):

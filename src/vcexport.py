@@ -15,7 +15,7 @@ import sys
 from pyVim import connect
 from pyVmomi import vim
 
-from performance_manager import PerformanceCollector
+from collectors.performance_collector import PerformanceCollector
 
 def write_csv_file(filename, headers, data_list):
     """
@@ -1096,7 +1096,10 @@ def export_vm_data(service_instance, info_file="RVTools_tabvInfo.csv", network_f
         duplicate_uuids = {}  # Will store UUID -> list of skipped VM names
 
         # Load VM name patterns to skip from file or use defaults
-        vm_skip_list = load_vm_skip_list("vm-skip-list.txt")
+        # Get the directory where this script is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        skip_list_path = os.path.join(script_dir, "vm-skip-list.txt")
+        vm_skip_list = load_vm_skip_list(skip_list_path)
 
         # Used to map VMs to a specific DVS 
         dvs_view = content.viewManager.CreateContainerView(container, [vim.DistributedVirtualSwitch], True)

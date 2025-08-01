@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """
-Unit tests for performance_manager.py module.
+Unit tests for performance_collector.py module.
 Tests the PerformanceCollector class and its methods.
 """
 
 import pytest
 import datetime
 from unittest.mock import Mock, patch
-from src.performance_manager import PerformanceCollector
+from src.collectors.performance_collector import PerformanceCollector
 from pyVmomi import vim
 
 
@@ -126,8 +126,8 @@ class TestPerformanceCollector:
         # Verify QueryAvailablePerfMetric was only called once due to caching
         assert performance_collector.perf_manager.QueryAvailablePerfMetric.call_count == 1  # Should only query vCenter once, then use cache
     
-    @patch('src.performance_manager.vim.PerformanceManager.QuerySpec')
-    @patch('src.performance_manager.vim.PerformanceManager.MetricId')
+    @patch('src.collectors.performance_collector.vim.PerformanceManager.QuerySpec')
+    @patch('src.collectors.performance_collector.vim.PerformanceManager.MetricId')
     def test_get_metric_values(self, mock_metric_id, mock_query_spec, performance_collector, mock_vm):
         """Test get_metric_values method"""
         # Setup mock performance query result
@@ -161,8 +161,8 @@ class TestPerformanceCollector:
         # Verify QueryPerf was called
         performance_collector.perf_manager.QueryPerf.assert_called_once()  # Should make exactly one performance query call
     
-    @patch('src.performance_manager.vim.PerformanceManager.QuerySpec')
-    @patch('src.performance_manager.vim.PerformanceManager.MetricId')
+    @patch('src.collectors.performance_collector.vim.PerformanceManager.QuerySpec')
+    @patch('src.collectors.performance_collector.vim.PerformanceManager.MetricId')
     def test_get_metric_values_empty_result(self, mock_metric_id, mock_query_spec, performance_collector, mock_vm):
         """Test get_metric_values with empty result"""
         performance_collector.perf_manager.QueryPerf.return_value = []
