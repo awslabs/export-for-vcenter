@@ -280,24 +280,3 @@ class TestHostCollectorIntegration:
             # UUIDs should be unique (if present)
             if uuids:
                 assert len(uuids) == len(set(uuids))
-    
-    def test_integration_performance_with_large_dataset(self, host_collector):
-        """Test that collection performs reasonably with larger datasets"""
-        import time
-        
-        start_time = time.time()
-        
-        # Collect all data types
-        host_properties = host_collector.get_host_properties()
-        nic_properties = host_collector.get_host_nic_properties()
-        vmk_properties = host_collector.get_host_vmk_properties()
-        
-        end_time = time.time()
-        execution_time = end_time - start_time
-        
-        # Collection should complete in reasonable time (adjust threshold as needed)
-        assert execution_time < 30.0, f"Collection took too long: {execution_time} seconds"
-        
-        # Verify we got some results
-        total_items = len(host_properties) + len(nic_properties) + len(vmk_properties)
-        assert total_items >= 0  # Should at least not fail

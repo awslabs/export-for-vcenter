@@ -133,21 +133,19 @@ export EXP_VCENTER_PASSWORD="xxxxx"
 
 #### Basic Usage
 
-The main script is located in the `src/` directory, but you can run it from the project root using the provided runner script:
+The main script is located in the `src/` directory. Run it from the project root:
 
 Windows
 
 ```powershell
-
-# Run from src directory
+# Run from project root
 python .\src\vcexport.py
 ```
 
 Linux/Mac:
 
 ```bash
-
-# Run from src directory
+# Run from project root
 python3 src/vcexport.py
 ```
 
@@ -185,7 +183,7 @@ The script automatically determines the appropriate vCenter sampling period base
 
 ### Script output
 
-The script will output a file named `vcexport.zip` in the same folder as `vcexport.py`. This zip file contains:
+The script will output a file named `vcexport.zip` in the project root directory. This zip file contains:
 - Standard inventory data in RVTools CSV format
 - Performance metrics data collected from vCenter performance statistics
 
