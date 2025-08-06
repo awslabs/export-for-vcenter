@@ -27,7 +27,7 @@ class TestExportForVCenterIntegration:
         cls.vcsim_port = 9090
         cls.vcsim_user = "user"
         cls.vcsim_password = "pass"
-        cls.script_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'vcexport_modular.py')
+        cls.script_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'vcexport.py')
         
         # Check if vcsim is running
         cls.vcsim_available = cls._check_vcsim_availability()
