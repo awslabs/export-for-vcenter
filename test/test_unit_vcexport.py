@@ -1,21 +1,17 @@
 #!/usr/bin/env python
 """
-Unit tests for vcexport_modular.py main script.
+Unit tests for vcexport.py main script.
 """
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 import sys
 import os
 import argparse
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-import vcexport_modular
+import vcexport
 
 
 class TestVCExportModular:
-    """Test cases for vcexport_modular.py main script."""
+    """Test cases for vcexport.py main script."""
     
     def setup_method(self):
         """Set up test fixtures before each test method."""
@@ -47,17 +43,18 @@ class TestVCExportModular:
             try:
                 # Import would trigger version check
                 import importlib
-                importlib.reload(vcexport_modular)
+                importlib.reload(vcexport)
             except SystemExit:
                 pytest.fail("Python version check should pass for 3.10+")
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_success_default_args(self, mock_orchestrator_class):
         """Test successful main execution with default arguments."""
         # Set up environment variables
         os.environ['EXP_VCENTER_HOST'] = 'test-vcenter.example.com'
         os.environ['EXP_VCENTER_USER'] = 'test-user'
         os.environ['EXP_VCENTER_PASSWORD'] = 'test-password'
+        os.environ['EXP_DISABLE_SSL_VERIFICATION'] = 'false'
         
         # Mock orchestrator instance
         mock_orchestrator = Mock()
@@ -66,10 +63,10 @@ class TestVCExportModular:
         mock_orchestrator_class.return_value = mock_orchestrator
         
         # Mock sys.argv for default arguments
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
-            vcexport_modular.main()
+            vcexport.main()
             
             # Verify orchestrator was created with correct parameters
             mock_orchestrator_class.assert_called_once_with(
@@ -92,7 +89,7 @@ class TestVCExportModular:
             # Should not exit with error
             mock_exit.assert_not_called()
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_success_custom_args(self, mock_orchestrator_class):
         """Test successful main execution with custom arguments."""
         # Set up environment variables
@@ -109,7 +106,7 @@ class TestVCExportModular:
         
         # Mock sys.argv with custom arguments
         sys.argv = [
-            'vcexport_modular.py',
+            'vcexport.py',
             '--no-statistics',
             '--perf-interval', '240',
             '--max-count', '50',
@@ -117,7 +114,7 @@ class TestVCExportModular:
         ]
         
         with patch('sys.exit') as mock_exit:
-            vcexport_modular.main()
+            vcexport.main()
             
             # Verify orchestrator was created with SSL verification disabled
             mock_orchestrator_class.assert_called_once_with(
@@ -141,11 +138,11 @@ class TestVCExportModular:
         for var in ['EXP_VCENTER_HOST', 'EXP_VCENTER_USER', 'EXP_VCENTER_PASSWORD']:
             os.environ.pop(var, None)
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print error message and exit
                 mock_print.assert_any_call(
@@ -160,11 +157,11 @@ class TestVCExportModular:
         os.environ.pop('EXP_VCENTER_USER', None)
         os.environ.pop('EXP_VCENTER_PASSWORD', None)
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print error message and exit
                 mock_print.assert_any_call(
@@ -172,7 +169,7 @@ class TestVCExportModular:
                 )
                 mock_exit.assert_called_with(1)
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_connection_failure(self, mock_orchestrator_class):
         """Test main execution with connection failure."""
         # Set up environment variables
@@ -185,11 +182,11 @@ class TestVCExportModular:
         mock_orchestrator.connect.return_value = False
         mock_orchestrator_class.return_value = mock_orchestrator
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print error message and exit
                 mock_print.assert_any_call("Failed to connect to vCenter")
@@ -198,7 +195,7 @@ class TestVCExportModular:
                 # Should still call disconnect
                 mock_orchestrator.disconnect.assert_called_once()
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_export_failure(self, mock_orchestrator_class):
         """Test main execution with export failure."""
         # Set up environment variables
@@ -212,11 +209,11 @@ class TestVCExportModular:
         mock_orchestrator.export_data.return_value = None  # Export failure
         mock_orchestrator_class.return_value = mock_orchestrator
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print error message and exit
                 mock_print.assert_called_with("Export failed")
@@ -225,7 +222,7 @@ class TestVCExportModular:
                 # Should still call disconnect
                 mock_orchestrator.disconnect.assert_called_once()
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_keyboard_interrupt(self, mock_orchestrator_class):
         """Test main execution with keyboard interrupt."""
         # Set up environment variables
@@ -239,11 +236,11 @@ class TestVCExportModular:
         mock_orchestrator.export_data.side_effect = KeyboardInterrupt()
         mock_orchestrator_class.return_value = mock_orchestrator
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print interrupt message and exit
                 mock_print.assert_called_with("\nExport interrupted by user")
@@ -252,7 +249,7 @@ class TestVCExportModular:
                 # Should still call disconnect
                 mock_orchestrator.disconnect.assert_called_once()
     
-    @patch('vcexport_modular.VCenterOrchestrator')
+    @patch('vcexport.VCenterOrchestrator')
     def test_main_generic_exception(self, mock_orchestrator_class):
         """Test main execution with generic exception."""
         # Set up environment variables
@@ -266,11 +263,11 @@ class TestVCExportModular:
         mock_orchestrator.export_data.side_effect = Exception("Test error")
         mock_orchestrator_class.return_value = mock_orchestrator
         
-        sys.argv = ['vcexport_modular.py']
+        sys.argv = ['vcexport.py']
         
         with patch('sys.exit') as mock_exit:
             with patch('builtins.print') as mock_print:
-                vcexport_modular.main()
+                vcexport.main()
                 
                 # Should print error message and exit
                 mock_print.assert_called_with("Export failed with error: Test error")
