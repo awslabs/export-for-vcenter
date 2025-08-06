@@ -283,8 +283,9 @@ class PerformanceCollector:
             batch = powered_on_vms[i:i+batch_size]
             print(f"Processing batch {i//batch_size + 1}/{(len(powered_on_vms) + batch_size - 1)//batch_size} ({len(batch)} VMs)")
             
+            processing_vm = i+1
             for vm in batch:
-                print(f"Processing VM {i+1} of {len(powered_on_vms)}: {vm.name}")
+                print(f"Processing VM {processing_vm} of {len(powered_on_vms)}: {vm.name}")
                 metrics = self.collect_detailed_vm_metrics(vm, interval_mins, samples, interval_id)
                 performance_metric = {
                     'VM Name': vm.name,
@@ -297,7 +298,7 @@ class PerformanceCollector:
                     performance_metric[metric_name] = value
                 
                 performance_metric_properties_list.append(performance_metric)  
-
+                processing_vm += 1
         return performance_metric_properties_list
 
     def get_metric_headers(self):
