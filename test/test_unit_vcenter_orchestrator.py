@@ -518,6 +518,39 @@ class TestVCenterOrchestrator:
         # Should not raise an exception
         self.orchestrator.disconnect()
 
+    @patch('vcenter_orchestrator.vim')
+    def test_collect_vm_data_none_network_properties(self, mock_vim):
+        """Test VM data collection when get_vm_network_properties returns None."""
+        # Mock VM
+        mock_vm = Mock()
+        mock_vm.name = "test-vm"
+
+        # Mock container view
+        mock_container_view = Mock()
+        mock_container_view.view = [mock_vm]
+
+        # Mock content and view manager
+        mock_content = Mock()
+        mock_content.viewManager.CreateContainerView.return_value = mock_container_view
+        self.orchestrator.content = mock_content
+        self.orchestrator.container = Mock()
+
+        # Mock VM collector
+        mock_vm_collector = Mock()
+        mock_vm_collector._should_skip_vm.return_value = False
+        mock_vm_collector._is_duplicate_uuid.return_value = False
+        mock_vm_collector.get_vm_properties.return_value = {"Primary IP Address": "192.168.1.1"}
+        mock_vm_collector.get_vm_network_properties.return_value = None  # Simulate missing vm.guest.net
+
+        self.orchestrator.vm_collector = mock_vm_collector
+
+        result = self.orchestrator.collect_vm_data()
+
+        # Verify VM was skipped due to None network properties
+        assert len(result["vm_info"]) == 0
+        assert len(result["vm_network"]) == 0
+        mock_container_view.Destroy.assert_called_once()
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
