@@ -257,6 +257,7 @@ class VMCollector:
             
         Returns:
             list: List of dictionaries with network properties for each NIC
+            None: If vm.guest.net is not found
         """
         network_properties_list = []
         
@@ -299,14 +300,7 @@ class VMCollector:
         
         # If no NICs were found, add a single entry with just the VM name
         if not network_properties_list:
-            network_properties_list.append({
-                "VM": vm.name,
-                "Network": "",
-                "IPv4 Address": "",
-                "IPv6 Address": "",
-                "Switch": "",
-                "Mac Address": ""
-            })
+            return None
         
         return network_properties_list
     

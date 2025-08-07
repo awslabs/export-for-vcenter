@@ -132,11 +132,16 @@ class VCenterOrchestrator:
                     if self.vm_collector._is_duplicate_uuid(vm_properties):
                         continue
                     
-                    vm_data["vm_info"].append(vm_properties)
-                
                     # Get VM network properties
                     vm_network_properties = self.vm_collector.get_vm_network_properties(vm)
+                    if vm_network_properties is None:
+                        print(f"Skipping VM {vm.name} (no network properties found)")
+                        continue
+
                     vm_data["vm_network"].extend(vm_network_properties)
+
+                    # Moved this below vm_network_properties, if the properties returns nothing we want to skip the VM
+                    vm_data["vm_info"].append(vm_properties)
                     
                     # Get VM CPU properties
                     vm_cpu_properties = self.vm_collector.get_vm_cpu_properties(vm)
