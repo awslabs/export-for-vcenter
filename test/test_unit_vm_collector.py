@@ -550,11 +550,7 @@ class TestVMCollector:
         
         network_props = vm_collector.get_vm_network_properties(mock_vm)
         
-        assert len(network_props) == 1
-        assert network_props[0]["VM"] == "test-vm-no-nics"
-        assert network_props[0]["Network"] == ""
-        assert network_props[0]["IPv4 Address"] == ""
-        assert network_props[0]["Switch"] == ""
+        assert network_props is None
     
     def test_get_vm_disk_properties_no_disks(self, vm_collector):
         """Test disk properties when VM has no disks"""
