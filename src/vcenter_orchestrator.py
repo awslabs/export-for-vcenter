@@ -74,6 +74,14 @@ class VCenterOrchestrator:
             "VI SDK UUID": about_info.instanceUuid if hasattr(about_info, "instanceUuid") else ""
         }
     
+    @staticmethod
+    def _print_skipped_vms_summary(skipped_vms):
+        """Print the VMs that were not exported, with the reason for each."""
+        if skipped_vms:
+            print(f"\n{len(skipped_vms)} VM(s) were skipped and not exported:")
+            for vm_name, reason in skipped_vms:
+                print(f"  {vm_name}: {reason}")
+
     def collect_vm_data(self, max_count=None):
         """
         Collect all VM-related data.
@@ -99,6 +107,9 @@ class VCenterOrchestrator:
             "vm_tools": []
         }
         
+        # (VM name, reason) for every VM left out of the export, printed at the end
+        skipped_vms = []
+
         try:
             all_vms = list(container_view.view)
             
@@ -116,6 +127,7 @@ class VCenterOrchestrator:
             for i, vm in enumerate(vms_to_process):
                 # Skip VMs that match patterns in skip list
                 if self.vm_collector._should_skip_vm(vm):
+                    skipped_vms.append((vm.name, "skip list or include-only list"))
                     continue
                 
                 print(f"Processing VM {i+1} of {total_vms}: {vm.name}")
@@ -126,16 +138,19 @@ class VCenterOrchestrator:
                     # Skip VMs without a primary IP address
                     if not vm_properties.get("Primary IP Address"):
                         print(f"Skipping VM {vm.name} (no primary IP address)")
+                        skipped_vms.append((vm.name, "no primary IP address"))
                         continue
 
                     # Check for duplicate UUID
                     if self.vm_collector._is_duplicate_uuid(vm_properties):
+                        skipped_vms.append((vm.name, "duplicate UUID"))
                         continue
                     
                     # Get VM network properties
                     vm_network_properties = self.vm_collector.get_vm_network_properties(vm)
                     if vm_network_properties is None:
                         print(f"Skipping VM {vm.name} (no network properties found)")
+                        skipped_vms.append((vm.name, "no network properties found"))
                         continue
 
                     vm_data["vm_network"].extend(vm_network_properties)
@@ -164,9 +179,13 @@ class VCenterOrchestrator:
                     vm_data["vm_tools"].append(vm_tools_properties)
                 else:
                     print(f"Skipping VM {vm.name}, powered off or invalid state.")
+                    skipped_vms.append((vm.name, "powered off or invalid state"))
             
             # Print duplicate UUIDs summary
             self.vm_collector.print_duplicate_uuids_summary()
+
+            # Print every skipped VM with its reason so none are missed in a long run
+            self._print_skipped_vms_summary(skipped_vms)
             
         finally:
             # Always clean up the container view
