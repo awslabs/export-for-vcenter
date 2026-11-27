@@ -324,6 +324,65 @@ class TestVCenterOrchestrator:
         assert len(result["vm_info"]) == 0
         mock_vm_collector.get_vm_network_properties.assert_not_called()
     
+    @patch('vcenter_orchestrator.vim')
+    def test_collect_vm_data_prints_skipped_vm_summary(self, mock_vim, capsys):
+        """Every skipped VM is listed with its reason after collection."""
+        def make_vm(name):
+            vm = Mock()
+            vm.name = name
+            return vm
+
+        listed = make_vm("vm-on-skip-list")
+        no_ip = make_vm("vm-no-ip")
+        off = make_vm("vm-off")
+        dup = make_vm("vm-dup")
+        no_net = make_vm("vm-no-net")
+
+        mock_container_view = Mock()
+        mock_container_view.view = [listed, no_ip, off, dup, no_net]
+        mock_content = Mock()
+        mock_content.viewManager.CreateContainerView.return_value = mock_container_view
+        self.orchestrator.content = mock_content
+        self.orchestrator.container = Mock()
+
+        props = {
+            "vm-no-ip": {"Primary IP Address": "", "VM": "vm-no-ip"},
+            "vm-off": None,
+            "vm-dup": {"Primary IP Address": "10.0.0.1", "VM": "vm-dup"},
+            "vm-no-net": {"Primary IP Address": "10.0.0.2", "VM": "vm-no-net"},
+        }
+        mock_vm_collector = Mock()
+        mock_vm_collector._should_skip_vm.side_effect = lambda vm: vm.name == "vm-on-skip-list"
+        mock_vm_collector.get_vm_properties.side_effect = lambda vm: props[vm.name]
+        mock_vm_collector._is_duplicate_uuid.side_effect = lambda p: p["VM"] == "vm-dup"
+        mock_vm_collector.get_vm_network_properties.return_value = None
+        self.orchestrator.vm_collector = mock_vm_collector
+
+        self.orchestrator.collect_vm_data()
+
+        out = capsys.readouterr().out
+        assert "5 VM(s) were skipped and not exported:" in out
+        assert "  vm-on-skip-list: skip list or include-only list" in out
+        assert "  vm-no-ip: no primary IP address" in out
+        assert "  vm-off: powered off or invalid state" in out
+        assert "  vm-dup: duplicate UUID" in out
+        assert "  vm-no-net: no network properties found" in out
+
+    @patch('vcenter_orchestrator.vim')
+    def test_collect_vm_data_no_skipped_summary_when_nothing_skipped(self, mock_vim, capsys):
+        """No skipped-VM section is printed when no VM is skipped."""
+        mock_container_view = Mock()
+        mock_container_view.view = []
+        mock_content = Mock()
+        mock_content.viewManager.CreateContainerView.return_value = mock_container_view
+        self.orchestrator.content = mock_content
+        self.orchestrator.container = Mock()
+        self.orchestrator.vm_collector = Mock()
+
+        self.orchestrator.collect_vm_data()
+
+        assert "were skipped" not in capsys.readouterr().out
+
     def test_collect_all_data_success(self):
         """Test successful collection of all data."""
         # Mock all collectors
